@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>C & B Pending Report</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary-teal: #3e8e9e;
+            --secondary-blue: #1a4b8c;
+            --accent-red: #ff3b30;
+            --link-blue: #007aff;
+            --bg-light: #f4f7f9;
+            --border-color: #dee2e6;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 30px;
+            background-color: var(--bg-light);
+            color: #333;
+        }
+
+        .app {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+
+        h2 {
+            color: var(--secondary-blue);
+            text-align: center;
+            font-size: 22px;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: var(--secondary-blue);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #153a6b;
+            transform: translateY(-1px);
+        }
+
+        input[type="file"] {
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .summary {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: #fff;
+            padding: 15px 25px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            text-align: center;
+            min-width: 150px;
+        }
+
+        .card .label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--secondary-blue);
+        }
+
+        .table-wrap {
+            overflow: visible;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            position: relative;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 1000px;
+        }
+
+        /* --- Header Styles --- */
+        thead th {
+            background-color: var(--primary-teal) !important;
+            color: white !important;
+            font-weight: 700;
+            font-size: 18px;
+            text-align: center;
+            padding: 14px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .report-title-cell {
+            background: white !important;
+            color: var(--secondary-blue) !important;
+            font-size: 32px !important;
+            font-weight: 800 !important;
+            padding: 25px !important;
+            text-align: center !important;
+            border: none !important;
+            position: sticky;
+            top: 0;
+            z-index: 15;
+        }
+
+        .header-row-1 th {
+            top: 68px;
+            z-index: 11;
+        }
+
+        .header-row-2 th {
+            top: 118px;
+            z-index: 11;
+        }
+
+        .location-header {
+            position: sticky;
+            left: 0;
+            z-index: 20 !important;
+            background-color: var(--primary-teal) !important;
+            min-width: 280px;
+        }
+
+        /* --- Body Styles --- */
+        tbody tr:nth-child(even) {
+            background-color: #f8fbff;
+        }
+
+        tbody tr:hover {
+            background-color: #f1f5f9;
+        }
+
+        td {
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .location-cell {
+            text-align: left;
+            font-weight: 700;
+            color: #2c3e50;
+            position: sticky;
+            left: 0;
+            background: inherit;
+            z-index: 5;
+            min-width: 280px;
+            padding-left: 20px;
+            border-right: 2px solid var(--border-color);
+        }
+
+        .clickable {
+            color: var(--link-blue);
+            text-decoration: none;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .zero-val {
+            color: #333;
+            font-weight: 700;
+            opacity: 0.8;
+        }
+
+        /* --- Footer Styles --- */
+        tfoot tr.footer-row td {
+            background-color: var(--secondary-blue) !important;
+            color: white !important;
+            font-weight: 700;
+            border-color: #153a6b;
+            padding: 15px;
+        }
+
+        tfoot tr.footer-row .location-cell {
+            background-color: var(--secondary-blue) !important;
+        }
+
+        .footer-total-val {
+            color: var(--accent-red) !important;
+            font-size: 22px;
+        }
+
+        /* --- Emergency Work Card --- */
+        .emg-card {
+            margin-top: 30px;
+            padding: 20px 30px;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            width: fit-content;
+        }
+
+        .emg-icon {
+            width: 40px;
+            height: 40px;
+            background: #ff9500;
+            color: #fff;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .emg-content {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+        }
+
+        .emg-label {
+            font-weight: 700;
+            color: var(--secondary-blue);
+            font-size: 15px;
+            text-transform: uppercase;
+        }
+
+        .emg-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--accent-red);
+        }
+
+        .emg-note {
+            font-size: 13px;
+            color: #888;
+            font-weight: 500;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal-box {
+            width: 92%;
+            max-height: 85vh;
+            overflow: auto;
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .small-table {
+            width: max-content;
+            min-width: 100%;
+            font-size: 14px;
+        }
+
+        .report-section {
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .section-header-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+
+        .copy-btn {
+            background: var(--primary-teal);
+            font-size: 13px;
+            padding: 8px 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <h2>C & B Pending Report Generator</h2>
+        <div class="controls">
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+            <button onclick="exportFullWorkbook()">Download Excel</button>
+            <button id="copyMainBtn" class="hidden" onclick="copySectionAsImage('mainReportContainer', this)" style="background: var(--primary-teal);">Copy Main Report</button>
+            <button id="copyCenterBtn" class="hidden" onclick="copySectionAsImage('centerKeralaContainer', this)" style="background: var(--primary-teal);">Copy Center Kerala</button>
+            <button id="copySouthBtn" class="hidden" onclick="copySouthSection()" style="background: var(--primary-teal);">Copy South Kerala</button>
+        </div>
+
+
+        <div id="summary" class="summary hidden"></div>
+
+        <div class="table-wrap hidden" id="tableWrap">
+            <div id="mainReportContainer" class="report-section">
+                <table id="reportTable"></table>
+            </div>
+            
+            <div id="centerKeralaContainer" class="report-section" style="margin-top: 50px; display: none;">
+                <table id="centerKeralaTable"></table>
+            </div>
+            
+            <div id="southKeralaContainer" class="report-section" style="margin-top: 50px; display: none;">
+                <table id="southKeralaTable"></table>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 id="modalTitle">Details</h3>
+                <button onclick="closeModal()">Close</button>
+            </div>
+            <div class="table-wrap" style="max-height:65vh">
+                <table id="detailTable" class="small-table"></table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let reportData = [];
+        let dateColumns = [];
+        let grandTotal = 0;
+        let filteredRawRows = [];
+        let drillMap = {};
+        let reportTime = '07.00AM';
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        document.getElementById('fileInput').addEventListener('change', handleFile);
+
+        function excelDateToJSDate(serial) {
+            const utcDays = Math.floor(serial - 25569);
+            const utcValue = utcDays * 86400;
+            const d = new Date(utcValue * 1000);
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        }
+        function parseDate(value) {
+            if (!value) return null;
+            if (typeof value === 'number') return excelDateToJSDate(value);
+            const text = String(value).trim();
+            let p;
+            if (/^\d{2}-\d{2}-\d{4}$/.test(text)) { p = text.split('-'); return new Date(+p[2], +p[1] - 1, +p[0]); }
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(text)) { p = text.split('/'); return new Date(+p[2], +p[1] - 1, +p[0]); }
+            const d = new Date(text);
+            if (isNaN(d)) return null;
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        }
+        function formatDate(date) {
+            return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+        }
+        function normalizeText(value) { return String(value || '').trim().toUpperCase(); }
+
+        function handleFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                const lookupMap = {};
+                const soReportSheetName = workbook.SheetNames.find(n => n.toUpperCase().replace(/ /g, '') === 'SOREPORT');
+                const soReportSheet = soReportSheetName ? workbook.Sheets[soReportSheetName] : null;
+
+                if (soReportSheet) {
+                    const soRows = XLSX.utils.sheet_to_json(soReportSheet, { header: 1, defval: '' });
+                    if (soRows.length > 0) {
+                        const soHeaders = soRows[0];
+                        let soJobIdx = soHeaders.findIndex(h => String(h).toUpperCase().includes('JOBCARD'));
+                        if (soJobIdx === -1) soJobIdx = 0;
+                        const permIdx = 45;
+                        soRows.slice(1).forEach((r) => {
+                            const jobNum = String(r[soJobIdx] || '').trim().toUpperCase();
+                            const permNum = r[permIdx];
+                            if (jobNum) lookupMap[jobNum] = permNum;
+                        });
+                    }
+                }
+
+                let sheetIndex = workbook.SheetNames.indexOf('Sheet1');
+                if (sheetIndex === -1) sheetIndex = 0;
+                const sheet = workbook.Sheets[workbook.SheetNames[sheetIndex]];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                if (rows.length < 2) { alert('No data found'); return; }
+                generateReport(rows, lookupMap);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function generateReport(rows, lookupMap = {}) {
+            const originalHeaders = rows[0];
+            const dataRows = rows.slice(1);
+            const targetColumns = [
+                'JobCardNum', 'Area', 'PriorityCode', 'StateCode', 'CustomerName',
+                'EMG NO:', 'ProductName', 'FamilyName', 'TeethCount', 'RegDate',
+                'RequiredDate', 'LastScanningLocation', 'Department.1', 'District'
+            ];
+
+            const colMap = {};
+            targetColumns.forEach(col => colMap[col] = originalHeaders.findIndex(h => normalizeText(h) === normalizeText(col)));
+
+            const jobIndex = colMap['JobCardNum'] !== -1 ? colMap['JobCardNum'] : 0;
+            const customerIndex = colMap['CustomerName'] !== -1 ? colMap['CustomerName'] : 4;
+            const dateIndex = colMap['RequiredDate'] !== -1 ? colMap['RequiredDate'] : 10;
+            const scanIndex = colMap['LastScanningLocation'] !== -1 ? colMap['LastScanningLocation'] : 11;
+            let teethIndex = colMap['TeethCount'];
+            if (teethIndex === -1) teethIndex = originalHeaders.findIndex(h => String(h).toLowerCase().includes('teeth'));
+
+            const matrix = {}, dateSet = new Set();
+            filteredRawRows = [];
+            drillMap = {};
+            grandTotal = 0;
+            let emergencyTeethCount = 0;
+
+            dataRows.forEach(row => {
+                const jobCard = normalizeText(row[jobIndex]);
+                const customer = normalizeText(row[customerIndex]);
+                const requiredDate = parseDate(row[dateIndex]);
+                const scanLocation = normalizeText(row[scanIndex]);
+                if (!jobCard || jobCard.startsWith('M') || ['SMILE DENTAL CARE', 'EMPIRE DENTAL CARE'].includes(customer) || !requiredDate || requiredDate > today || !scanLocation || scanLocation === 'FINALATTACHEMENTPACK') return;
+
+                const dateKey = formatDate(requiredDate);
+                const teethCount = teethIndex >= 0 ? Number(row[teethIndex]) || 0 : 1;
+                const key = `${scanLocation}||${dateKey}`;
+                if (!drillMap[key]) drillMap[key] = [];
+
+                const mappedRow = {};
+                targetColumns.forEach(col => {
+                    let val = (colMap[col] !== -1) ? row[colMap[col]] : '';
+                    if (col === 'EMG NO:' && lookupMap[jobCard]) {
+                        const prio = normalizeText(row[colMap['PriorityCode']]);
+                        if (prio !== 'K4' && prio !== 'L1') val = lookupMap[jobCard];
+                    }
+                    mappedRow[col] = val;
+                });
+
+                mappedRow['TeethCount'] = teethCount;
+                mappedRow.__RequiredDateFormatted = dateKey;
+                mappedRow.__LastScanningLocation = scanLocation;
+
+                drillMap[key].push(mappedRow);
+                filteredRawRows.push(mappedRow);
+
+                if (!matrix[scanLocation]) matrix[scanLocation] = {};
+                if (!matrix[scanLocation][dateKey]) matrix[scanLocation][dateKey] = 0;
+                matrix[scanLocation][dateKey] += teethCount;
+                dateSet.add(dateKey);
+                grandTotal += teethCount;
+
+                if (mappedRow['EMG NO:'] && String(mappedRow['EMG NO:']).trim() !== '') emergencyTeethCount += teethCount;
+            });
+
+            window.emergencyWorkCount = emergencyTeethCount;
+            dateColumns = Array.from(dateSet).sort((a, b) => parseDate(a) - parseDate(b));
+            reportData = Object.keys(matrix).sort().map(location => {
+                const item = { location, total: 0 };
+                dateColumns.forEach(date => { item[date] = matrix[location][date] || 0; item.total += item[date]; });
+                return item;
+            });
+
+            renderSummary(filteredRawRows.length, reportData.length, dateColumns.length, grandTotal);
+            renderAllReports();
+        }
+
+        function renderSummary(rows, locations, dates, total) {
+            document.getElementById('summary').classList.remove('hidden');
+            document.getElementById('summary').innerHTML = `
+                <div class="card"><div class="label">Filtered Rows</div><div class="value">${rows}</div></div>
+                <div class="card"><div class="label">Locations</div><div class="value">${locations}</div></div>
+                <div class="card"><div class="label">Dates</div><div class="value">${dates}</div></div>
+                <div class="card"><div class="label">Total Teeth</div><div class="value">${total}</div></div>`;
+        }
+
+        function getReportDataFromRows(rows) {
+            const matrix = {};
+            const dateSet = new Set();
+            let total = 0;
+
+            rows.forEach(r => {
+                const loc = r.__LastScanningLocation;
+                const dt = r.__RequiredDateFormatted;
+                const teeth = Number(r.TeethCount) || 0;
+
+                if (!matrix[loc]) matrix[loc] = {};
+                if (!matrix[loc][dt]) matrix[loc][dt] = 0;
+                matrix[loc][dt] += teeth;
+                dateSet.add(dt);
+                total += teeth;
+            });
+
+            const dates = Array.from(dateSet).sort((a, b) => parseDate(a) - parseDate(b));
+            const data = Object.keys(matrix).sort().map(location => {
+                const item = { location, total: 0 };
+                dates.forEach(date => { item[date] = matrix[location][date] || 0; item.total += item[date]; });
+                return item;
+            });
+
+            return { data, dates, total };
+        }
+
+        function renderAllReports() {
+            document.getElementById('tableWrap').classList.remove('hidden');
+
+            // 1. Main Report
+            const mainReport = getReportDataFromRows(filteredRawRows);
+            renderTable('reportTable', `C & B PENDING REPORT @ <span contenteditable="true" oninput="reportTime = this.innerText" style="border-bottom: 1px dashed var(--secondary-blue); cursor: text; padding: 0 4px;">${reportTime}</span>`, mainReport.data, mainReport.dates, mainReport.total);
+            document.getElementById('copyMainBtn').classList.remove('hidden');
+
+            // 2. Center Kerala
+            const centerRows = filteredRawRows.filter(r => normalizeText(r.District) === 'CENTER KERALA');
+            const centerReport = getReportDataFromRows(centerRows);
+            if (centerReport.data.length > 0) {
+                document.getElementById('centerKeralaContainer').style.display = 'block';
+                document.getElementById('copyCenterBtn').classList.remove('hidden');
+                renderTable('centerKeralaTable', 'CENTER KERALA PENDING REPORT', centerReport.data, centerReport.dates, centerReport.total);
+            } else {
+                document.getElementById('centerKeralaContainer').style.display = 'none';
+                document.getElementById('copyCenterBtn').classList.add('hidden');
+            }
+
+            // 3. South Kerala
+            const southRows = filteredRawRows.filter(r => normalizeText(r.District) === 'SOUTH KERALA');
+            const southReport = getReportDataFromRows(southRows);
+            if (southReport.data.length > 0) {
+                document.getElementById('southKeralaContainer').style.display = 'block';
+                document.getElementById('copySouthBtn').classList.remove('hidden');
+                renderTable('southKeralaTable', 'SOUTH KERALA PENDING REPORT', southReport.data, southReport.dates, southReport.total);
+            } else {
+                document.getElementById('southKeralaContainer').style.display = 'none';
+                document.getElementById('copySouthBtn').classList.add('hidden');
+            }
+
+            updateEmergencySummary();
+        }
+
+        function renderTable(tableId, title, data, dates, totalTeeth) {
+            const table = document.getElementById(tableId);
+            const colSpan = dates.length + 2;
+
+            let html = `<thead>
+                <tr><th colspan="${colSpan}" class="report-title-cell">${title}</th></tr>
+                <tr class="header-row-1">
+                    <th rowspan="2" class="location-header">LAST<br>SCANNING<br>LOCATION</th>
+                    <th colspan="${dates.length}">REQUIRED DATE</th>
+                    <th rowspan="2">Grand Total</th>
+                </tr>
+                <tr class="header-row-2">
+                    ${dates.map(d => `<th>📅 ${d}</th>`).join('')}
+                </tr>
+            </thead><tbody>`;
+
+            data.forEach(row => {
+                html += `<tr><td class="location-cell">${row.location}</td>`;
+                dates.forEach(date => {
+                    const val = row[date] || 0;
+                    if (val > 0) {
+                        html += `<td><span class="clickable" onclick="showDetails('${encodeURIComponent(row.location)}','${date}')">${val}</span></td>`;
+                    } else {
+                        html += `<td><span class="zero-val">0</span></td>`;
+                    }
+                });
+                const total = row.total || 0;
+                html += `<td><span class="${total > 0 ? 'clickable' : 'zero-val'}" onclick="showLocationDetails('${encodeURIComponent(row.location)}')">${total}</span></td></tr>`;
+            });
+            html += `</tbody><tfoot><tr class="footer-row">
+                <td class="location-cell">TOTAL</td>`;
+
+            dates.forEach(date => {
+                const total = data.reduce((s, r) => s + (r[date] || 0), 0);
+                html += `<td class="footer-total-val">${total}</td>`;
+            });
+            html += `<td class="footer-total-val">${totalTeeth}</td></tr></tfoot>`;
+
+            table.innerHTML = html;
+        }
+
+        function updateEmergencySummary() {
+            const oldSum = document.getElementById('emgSummary');
+            if (oldSum) oldSum.remove();
+
+            const emgCard = document.createElement('div');
+            emgCard.id = 'emgSummary';
+            emgCard.className = 'emg-card';
+            emgCard.style.marginTop = '20px';
+            emgCard.innerHTML = `
+                <div class="emg-icon">!</div>
+                <div class="emg-content">
+                    <div class="emg-label">EMERGENCY WORK:</div>
+                    <div class="emg-value">${window.emergencyWorkCount || 0}</div>
+                    <div class="emg-note">(K4, L1 NOT CONSIDRED)</div>
+                </div>`;
+            
+            document.getElementById('mainReportContainer').appendChild(emgCard);
+        }
+
+        async function copySectionAsImage(containerId, btn) {
+            const originalText = btn.textContent;
+            btn.textContent = 'Generating...';
+            btn.disabled = true;
+
+            try {
+                const container = document.getElementById(containerId);
+                const canvas = await html2canvas(container, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                });
+
+                canvas.toBlob(async (blob) => {
+                    try {
+                        const item = new ClipboardItem({ "image/png": blob });
+                        await navigator.clipboard.write([item]);
+                        btn.textContent = '✅ Copied!';
+                        btn.style.background = '#28a745';
+                        setTimeout(() => {
+                            btn.textContent = originalText;
+                            btn.style.background = '';
+                            btn.disabled = false;
+                        }, 2000);
+                    } catch (err) {
+                        console.error(err);
+                        alert("Clipboard error: " + err.message);
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                    }
+                }, 'image/png');
+
+            } catch (error) {
+                console.error(error);
+                alert("Image capture failed: " + error.message);
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function copySouthSection() {
+            // Special handler for south because of the specific button ID if needed
+            copySectionAsImage('southKeralaContainer', document.getElementById('copySouthBtn'));
+        }
+
+        function showDetails(encodedLocation, date) {
+            const location = decodeURIComponent(encodedLocation);
+            const rows = drillMap[`${location}||${date}`] || [];
+            renderDetailModal(`${location} | ${date} | ${rows.length} Job Cards`, rows);
+        }
+        function showLocationDetails(encodedLocation) {
+            const location = decodeURIComponent(encodedLocation);
+            const rows = filteredRawRows.filter(r => r.__LastScanningLocation === location);
+            renderDetailModal(`${location} | Grand Total | ${rows.length} Job Cards`, rows);
+        }
+        function renderDetailModal(title, rows) {
+            document.getElementById('modalTitle').textContent = title;
+            const detailTable = document.getElementById('detailTable');
+            const headers = [
+                'JobCardNum', 'Area', 'PriorityCode', 'StateCode', 'CustomerName',
+                'EMG NO:', 'ProductName', 'FamilyName', 'TeethCount', 'RegDate',
+                'RequiredDate', 'LastScanningLocation', 'Department.1', 'District'
+            ];
+            let html = `<thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+            rows.forEach(r => {
+                html += `<tr>`;
+                headers.forEach(h => html += `<td>${r[h] ?? ''}</td>`);
+                html += `</tr>`;
+            });
+            html += `</tbody>`;
+            detailTable.innerHTML = html;
+            document.getElementById('modal').style.display = 'flex';
+        }
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+        async function exportFullWorkbook() {
+            try {
+                if (!reportData.length) {
+                    alert('Please upload data and generate the report first.');
+                    return;
+                }
+
+                const workbook = new ExcelJS.Workbook();
+                const reportSheet = workbook.addWorksheet('Report');
+                const detailsSheet = workbook.addWorksheet('Details');
+                const sourceSheet = workbook.addWorksheet('Source Data');
+
+                // ── Styles ───────────────────────────────────────────────────
+                const blueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8DB4E2' } };
+                const orangeFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFABF8F' } };
+                const thinBorder = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+                const boldFont = { bold: true };
+                const centerAlign = { horizontal: 'center', vertical: 'middle' };
+                const leftAlign = { horizontal: 'left', vertical: 'middle' };
+
+                // ── 1. Build Details Sheet (with Style) ──────────────────────
+                const detailHeaders = [
+                    'JobCardNum', 'Area', 'PriorityCode', 'StateCode', 'CustomerName',
+                    'EMG NO:', 'ProductName', 'FamilyName', 'TeethCount', 'RegDate',
+                    'RequiredDate', 'LastScanningLocation', 'Department.1', 'District'
+                ];
+                let currentDetailRow = 1;
+
+                const sortedKeys = Object.keys(drillMap).sort((a, b) => {
+                    const [locA, dtA] = a.split('||');
+                    const [locB, dtB] = b.split('||');
+                    if (locA !== locB) return locA.localeCompare(locB);
+                    return parseDate(dtA) - parseDate(dtB);
+                });
+
+                const linkTargetMap = {}; // "LOC||DATE" -> Excel cell reference
+                const locationFirstTargetMap = {}; // "LOC" -> Excel cell reference
+
+                sortedKeys.forEach(key => {
+                    const [loc, dt] = key.split('||');
+                    const rows = drillMap[key];
+                    const teethSum = rows.reduce((s, r) => s + (Number(r.TeethCount) || 1), 0);
+
+                    // Section Header (Blue Group Header)
+                    const headerRow = detailsSheet.getRow(currentDetailRow);
+                    const headerText = `${loc} - ${dt} (${rows.length} records, ${teethSum} teeth)`;
+                    headerRow.getCell(1).value = headerText;
+                    headerRow.getCell(1).fill = blueFill;
+                    headerRow.getCell(1).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
+                    detailsSheet.mergeCells(currentDetailRow, 1, currentDetailRow, detailHeaders.length);
+
+                    linkTargetMap[key] = `Details!A${currentDetailRow}`;
+                    if (!(loc in locationFirstTargetMap)) locationFirstTargetMap[loc] = `Details!A${currentDetailRow}`;
+
+                    currentDetailRow++;
+
+                    // Column Headers (Orange Fill)
+                    const colHeaderRow = detailsSheet.getRow(currentDetailRow);
+                    detailHeaders.forEach((h, i) => {
+                        const cell = colHeaderRow.getCell(i + 1);
+                        cell.value = h;
+                        cell.fill = orangeFill;
+                        cell.font = boldFont;
+                        cell.border = thinBorder;
+                        cell.alignment = centerAlign;
+                    });
+                    currentDetailRow++;
+
+                    // Data Rows
+                    rows.forEach(r => {
+                        const dataRow = detailsSheet.getRow(currentDetailRow);
+                        detailHeaders.forEach((h, i) => {
+                            const cell = dataRow.getCell(i + 1);
+                            cell.value = r[h] ?? '';
+                            cell.border = thinBorder;
+                        });
+                        currentDetailRow++;
+                    });
+
+                    currentDetailRow++; // Blank separator
+                });
+
+                detailsSheet.columns = detailHeaders.map(() => ({ width: 20 }));
+                detailsSheet.getColumn(1).width = 25;
+                detailsSheet.getColumn(5).width = 40; // CustomerName
+                detailsSheet.getColumn(7).width = 40; // ProductName
+
+                // ── 2. Build Report Sheet ────────────────────────────────────
+                function fillReportSheet(rowsForReport, titleText, startRow) {
+                    const reportInfo = getReportDataFromRows(rowsForReport);
+                    if (reportInfo.data.length === 0) return startRow;
+
+                    const reportDates = reportInfo.dates;
+                    const reportDataItems = reportInfo.data;
+
+                    reportSheet.mergeCells(startRow, 1, startRow, reportDates.length + 2);
+                    const tCell = reportSheet.getCell(startRow, 1);
+                    tCell.value = titleText.replace(/<[^>]*>/g, ''); // Remove HTML
+                    tCell.fill = blueFill;
+                    tCell.font = { bold: true, size: 14 };
+                    tCell.alignment = centerAlign;
+                    tCell.border = thinBorder;
+
+                    const hRow = reportSheet.getRow(startRow + 1);
+                    ['LAST SCANNING LOCATION', ...reportDates, 'Grand Total'].forEach((h, i) => {
+                        const cell = hRow.getCell(i + 1);
+                        cell.value = h;
+                        cell.fill = blueFill;
+                        cell.font = boldFont;
+                        cell.border = thinBorder;
+                        cell.alignment = centerAlign;
+                    });
+
+                    reportDataItems.forEach((r, idx) => {
+                        const row = reportSheet.getRow(startRow + 2 + idx);
+                        const lCell = row.getCell(1);
+                        lCell.value = r.location;
+                        lCell.font = boldFont;
+                        lCell.border = thinBorder;
+
+                        reportDates.forEach((date, cIdx) => {
+                            const cell = row.getCell(cIdx + 2);
+                            const val = r[date] || 0;
+                            cell.value = val;
+                            cell.border = thinBorder;
+                            cell.alignment = centerAlign;
+                            if (val > 0) {
+                                const target = linkTargetMap[`${r.location}||${date}`];
+                                if (target) {
+                                    cell.value = { text: val.toString(), hyperlink: `#${target}` };
+                                    cell.font = { color: { argb: 'FF0000FF' }, underline: false, bold: true };
+                                }
+                            }
+                        });
+
+                        const gCell = row.getCell(reportDates.length + 2);
+                        gCell.value = r.total;
+                        gCell.font = boldFont;
+                        gCell.border = thinBorder;
+                        gCell.alignment = centerAlign;
+                        const target = locationFirstTargetMap[r.location];
+                        if (target) {
+                            gCell.value = { text: r.total.toString(), hyperlink: `#${target}` };
+                            gCell.font = { color: { argb: 'FF0000FF' }, underline: false, bold: true };
+                        }
+                    });
+
+                    const tRow = reportSheet.getRow(startRow + 2 + reportDataItems.length);
+                    const tLabel = tRow.getCell(1);
+                    tLabel.value = 'TOTAL';
+                    tLabel.fill = blueFill;
+                    tLabel.font = { bold: true, color: { argb: 'FFFF0000' } };
+                    tLabel.border = thinBorder;
+
+                    reportDates.forEach((date, cIdx) => {
+                        const total = reportDataItems.reduce((s, r) => s + (r[date] || 0), 0);
+                        const cell = tRow.getCell(cIdx + 2);
+                        cell.value = total;
+                        cell.font = { bold: true, color: { argb: 'FFFF0000' } };
+                        cell.border = thinBorder;
+                        cell.alignment = centerAlign;
+                    });
+                    const grandCell = tRow.getCell(reportDates.length + 2);
+                    grandCell.value = reportInfo.total;
+                    grandCell.font = { bold: true, color: { argb: 'FFFF0000' } };
+                    grandCell.border = thinBorder;
+                    grandCell.alignment = centerAlign;
+
+                    return startRow + reportDataItems.length + 5; // Return next start row
+                }
+
+                let nextRow = fillReportSheet(filteredRawRows, `C & B PENDING REPORT @ ${reportTime}`, 1);
+                nextRow = fillReportSheet(filteredRawRows.filter(r => normalizeText(r.District) === 'CENTER KERALA'), 'CENTER KERALA PENDING REPORT', nextRow);
+                nextRow = fillReportSheet(filteredRawRows.filter(r => normalizeText(r.District) === 'SOUTH KERALA'), 'SOUTH KERALA PENDING REPORT', nextRow);
+
+                reportSheet.getColumn(1).width = 40;
+                dateColumns.forEach((_, i) => reportSheet.getColumn(i + 2).width = 12);
+                reportSheet.getColumn(dateColumns.length + 2).width = 15;
+
+                // Emergency Work Row (Excel)
+                const emgLabelCell = reportSheet.getRow(nextRow).getCell(1);
+                const emgValCell = reportSheet.getRow(nextRow).getCell(2);
+
+                emgLabelCell.value = 'EMERGENCY WORK';
+                emgLabelCell.font = { bold: true, size: 12 };
+
+                emgValCell.value = (window.emergencyWorkCount || 0) + ' (K4, L1 NOT CONSIDRED)';
+                emgValCell.font = { bold: true, size: 12, color: { argb: 'FFFF0000' } };
+                emgValCell.alignment = centerAlign;
+                emgValCell.border = thinBorder;
+                emgValCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } }; // Light yellow fill for emphasis
+
+                // ── 3. Source Data Sheet ─────────────────────────────────────
+                // Source Data Header
+                const sourceHeaderRow = sourceSheet.getRow(1);
+                detailHeaders.forEach((h, i) => {
+                    const cell = sourceHeaderRow.getCell(i + 1);
+                    cell.value = h;
+                    cell.fill = blueFill;
+                    cell.font = boldFont;
+                    cell.border = thinBorder;
+                    cell.alignment = centerAlign;
+                });
+
+                filteredRawRows.forEach((r, idx) => {
+                    const dataRow = sourceSheet.getRow(idx + 2);
+                    detailHeaders.forEach((h, i) => {
+                        const cell = dataRow.getCell(i + 1);
+                        cell.value = r[h] ?? '';
+                        cell.border = thinBorder;
+                    });
+                });
+
+                sourceSheet.columns = detailHeaders.map(() => ({ width: 20 }));
+                sourceSheet.getColumn(5).width = 40;
+                sourceSheet.getColumn(7).width = 40;
+
+                // ── Download ─────────────────────────────────────────────────
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'CB_Pending_Report.xlsx';
+                a.click();
+                window.URL.revokeObjectURL(url);
+
+            } catch (error) {
+                console.error(error);
+                alert('Excel download failed: ' + error.message);
+            }
+        }
+
+    </script>
+</body>
+
+</html>
