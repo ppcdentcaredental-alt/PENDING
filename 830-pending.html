@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>8.30 Pending Cleaner</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <style>
+        :root {
+            --primary-teal: #3e8e9e;
+            --secondary-blue: #1a4b8c;
+            --accent-red: #ff3b30;
+            --bg-light: #f4f7f9;
+            --border-color: #dee2e6;
+            --text: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 30px;
+            background-color: var(--bg-light);
+            color: var(--text);
+        }
+
+        .app {
+            max-width: 980px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+
+        h2 {
+            color: var(--secondary-blue);
+            text-align: center;
+            font-size: 22px;
+            margin: 0 0 25px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        input[type="file"] {
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 6px;
+            min-width: 300px;
+        }
+
+        label {
+            display: grid;
+            gap: 6px;
+            color: #5f6b7a;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: var(--secondary-blue);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #153a6b;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+            transform: none;
+        }
+
+        .back-btn {
+            background: var(--primary-teal);
+        }
+
+        .status {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 18px;
+            background: #fbfcfe;
+            line-height: 1.6;
+            min-height: 70px;
+        }
+
+        .status strong {
+            color: var(--secondary-blue);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .note {
+            margin-top: 16px;
+            color: #5f6b7a;
+            font-size: 14px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <h2>8.30 Pending Cleaner</h2>
+        <div class="controls">
+            <label>
+                Pending workbook
+                <input type="file" id="sourceFileInput" accept=".xlsx" />
+            </label>
+            <label>
+                SO Report
+                <input type="file" id="soFileInput" accept=".xlsx" />
+            </label>
+            <button id="processBtn" onclick="processWorkbook()" disabled>Download Cleaned Excel</button>
+            <button class="back-btn" onclick="window.location.href='index.html'">Back</button>
+        </div>
+        <div id="status" class="status">
+            Upload a pending workbook containing <strong>Source Data</strong>, then upload the <strong>SO Report</strong>.
+        </div>
+        <div class="note">
+            If the pending workbook already has an SO Report sheet, the second upload can be left empty.
+        </div>
+    </div>
+
+    <script>
+        let sourceFile = null;
+        let soReportFile = null;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const excludedLocations = new Set([
+            'BILLING',
+            'PACKING',
+            'FINAL PACKING',
+            'FINALATTACHEMENTPACK',
+            'QA',
+            'ATTACHEMENTDISP',
+            'PATIENT ROOM'
+        ]);
+
+        document.getElementById('sourceFileInput').addEventListener('change', (event) => {
+            sourceFile = event.target.files[0] || null;
+            updateReadyStatus();
+        });
+
+        document.getElementById('soFileInput').addEventListener('change', (event) => {
+            soReportFile = event.target.files[0] || null;
+            updateReadyStatus();
+        });
+
+        function updateReadyStatus() {
+            document.getElementById('processBtn').disabled = !sourceFile;
+            if (!sourceFile) {
+                setStatus('Upload a pending workbook containing <strong>Source Data</strong>, then upload the <strong>SO Report</strong>.');
+                return;
+            }
+
+            const soName = soReportFile ? escapeHtml(soReportFile.name) : 'using SO Report sheet inside pending workbook';
+            setStatus(`Ready: <strong>${escapeHtml(sourceFile.name)}</strong><br>SO Report: <strong>${soName}</strong>`);
+        }
+
+        function setStatus(message) {
+            document.getElementById('status').innerHTML = message;
+        }
+
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char]));
+        }
+
+        function normalizeText(value) {
+            return String(value || '').trim().toUpperCase().replace(/\s+/g, ' ');
+        }
+
+        function compactText(value) {
+            return normalizeText(value).replace(/[^A-Z0-9]/g, '');
+        }
+
+        function getCellValue(cell) {
+            const value = cell ? cell.value : '';
+            if (value && typeof value === 'object') {
+                if ('result' in value) return value.result;
+                if ('text' in value) return value.text;
+                if ('richText' in value) return value.richText.map(part => part.text).join('');
+            }
+            return value ?? '';
+        }
+
+        function setCellValue(row, columnNumber, value) {
+            const cell = row.getCell(columnNumber);
+            cell.value = value ?? '';
+        }
+
+        function findSheet(workbook, wantedName) {
+            const compactWanted = compactText(wantedName);
+            return workbook.worksheets.find(sheet => compactText(sheet.name) === compactWanted);
+        }
+
+        function readHeaders(worksheet) {
+            const headers = {};
+            const headerRow = worksheet.getRow(1);
+            headerRow.eachCell({ includeEmpty: true }, (cell, columnNumber) => {
+                const header = normalizeText(getCellValue(cell));
+                if (header) headers[header] = columnNumber;
+            });
+            return headers;
+        }
+
+        function findHeader(headers, matchers) {
+            const entries = Object.entries(headers);
+            for (const matcher of matchers) {
+                const found = entries.find(([header]) => matcher(header, compactText(header)));
+                if (found) return found[1];
+            }
+            return 0;
+        }
+
+        function findJobColumn(headers) {
+            return findHeader(headers, [
+                (_, compact) => compact === 'JOBCARDNUM',
+                (_, compact) => compact === 'JOBCARDNO',
+                (_, compact) => compact.includes('JOBCARD'),
+                (_, compact) => compact.includes('JOBNO')
+            ]);
+        }
+
+        function findReqDateColumn(headers) {
+            return findHeader(headers, [
+                (_, compact) => compact === 'REQUIREDDATE',
+                (_, compact) => compact === 'REQDATE',
+                (header, compact) => compact.includes('REQ') && compact.includes('DATE'),
+                (header, compact) => compact.includes('REQUIRED') && compact.includes('DATE')
+            ]);
+        }
+
+        function findScanLocationColumn(headers) {
+            return findHeader(headers, [
+                (_, compact) => compact === 'LASTSCANNINGLOCATION',
+                (_, compact) => compact.includes('LAST') && compact.includes('SCANNING') && compact.includes('LOCATION'),
+                (_, compact) => compact.includes('SCAN') && compact.includes('LOCATION')
+            ]);
+        }
+
+        function parseDate(value) {
+            if (!value) return null;
+            if (value instanceof Date) return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+            if (typeof value === 'number') {
+                const date = new Date(Math.round((value - 25569) * 86400 * 1000));
+                return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            }
+            const text = String(value).trim();
+            let parts = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+            if (parts) {
+                const year = Number(parts[3].length === 2 ? `20${parts[3]}` : parts[3]);
+                return new Date(year, Number(parts[2]) - 1, Number(parts[1]));
+            }
+            const parsed = new Date(text);
+            if (Number.isNaN(parsed.getTime())) return null;
+            return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+        }
+
+        function buildSoLookup(soSheet) {
+            const headers = readHeaders(soSheet);
+            const jobColumn = findJobColumn(headers);
+            const reqDateColumn = findReqDateColumn(headers);
+            const scanColumn = findScanLocationColumn(headers);
+
+            if (!jobColumn || !reqDateColumn || !scanColumn) {
+                throw new Error('SO Report must have JobCard, Req/Required Date, and Last Scanning Location columns.');
+            }
+
+            const lookup = new Map();
+            soSheet.eachRow((row, rowNumber) => {
+                if (rowNumber === 1) return;
+                const jobCard = compactText(getCellValue(row.getCell(jobColumn)));
+                if (!jobCard) return;
+                lookup.set(jobCard, {
+                    requiredDate: getCellValue(row.getCell(reqDateColumn)),
+                    scanLocation: getCellValue(row.getCell(scanColumn))
+                });
+            });
+
+            return lookup;
+        }
+
+        async function processWorkbook() {
+            if (!sourceFile) return;
+
+            const processBtn = document.getElementById('processBtn');
+            processBtn.disabled = true;
+            setStatus('Processing workbook...');
+
+            try {
+                const workbook = new ExcelJS.Workbook();
+                const buffer = await sourceFile.arrayBuffer();
+                await workbook.xlsx.load(buffer);
+
+                const sourceSheet = findSheet(workbook, 'Source Data');
+                let soSheet = findSheet(workbook, 'SO Report');
+
+                if (soReportFile) {
+                    const soWorkbook = new ExcelJS.Workbook();
+                    const soBuffer = await soReportFile.arrayBuffer();
+                    await soWorkbook.xlsx.load(soBuffer);
+                    soSheet = findSheet(soWorkbook, 'SO Report') || soWorkbook.worksheets[0];
+                }
+
+                if (!sourceSheet) throw new Error('Source Data sheet not found.');
+                if (!soSheet) throw new Error('SO Report sheet not found.');
+
+                const sourceHeaders = readHeaders(sourceSheet);
+                const sourceJobColumn = findJobColumn(sourceHeaders);
+                const sourceReqDateColumn = findReqDateColumn(sourceHeaders);
+                const sourceScanColumn = findScanLocationColumn(sourceHeaders);
+
+                if (!sourceJobColumn || !sourceReqDateColumn || !sourceScanColumn) {
+                    throw new Error('Source Data must have JobCard, Req/Required Date, and Last Scanning Location columns.');
+                }
+
+                const soLookup = buildSoLookup(soSheet);
+                let updatedRows = 0;
+                let missingRows = 0;
+
+                sourceSheet.eachRow((row, rowNumber) => {
+                    if (rowNumber === 1) return;
+                    setCellValue(row, sourceReqDateColumn, '');
+                    setCellValue(row, sourceScanColumn, '');
+
+                    const jobCard = compactText(getCellValue(row.getCell(sourceJobColumn)));
+                    const lookupValue = soLookup.get(jobCard);
+                    if (!jobCard || !lookupValue) {
+                        missingRows++;
+                        return;
+                    }
+
+                    setCellValue(row, sourceReqDateColumn, lookupValue.requiredDate);
+                    setCellValue(row, sourceScanColumn, lookupValue.scanLocation);
+                    updatedRows++;
+                });
+
+                let removedFutureRows = 0;
+                let removedBlankReqRows = 0;
+                let removedLocationRows = 0;
+                for (let rowNumber = sourceSheet.rowCount; rowNumber >= 2; rowNumber--) {
+                    const row = sourceSheet.getRow(rowNumber);
+                    const requiredDateValue = getCellValue(row.getCell(sourceReqDateColumn));
+                    const requiredDate = parseDate(requiredDateValue);
+                    const scanLocation = normalizeText(getCellValue(row.getCell(sourceScanColumn)));
+                    const shouldRemoveBlankReq = !requiredDateValue || !requiredDate;
+                    const shouldRemoveFuture = requiredDate && requiredDate > today;
+                    const shouldRemoveLocation = excludedLocations.has(scanLocation);
+
+                    if (shouldRemoveBlankReq || shouldRemoveFuture || shouldRemoveLocation) {
+                        if (shouldRemoveBlankReq) removedBlankReqRows++;
+                        if (shouldRemoveFuture) removedFutureRows++;
+                        if (shouldRemoveLocation) removedLocationRows++;
+                        sourceSheet.spliceRows(rowNumber, 1);
+                    }
+                }
+
+                const outputBuffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([outputBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = '830_Pending_Cleaned.xlsx';
+                link.click();
+                URL.revokeObjectURL(url);
+
+                setStatus(`
+                    <strong>Done.</strong><br>
+                    Updated from SO Report: <strong>${updatedRows}</strong><br>
+                    Missing SO Report match: <strong>${missingRows}</strong><br>
+                    Removed blank Req Date rows: <strong>${removedBlankReqRows}</strong><br>
+                    Removed overdate rows: <strong>${removedFutureRows}</strong><br>
+                    Removed blocked location rows: <strong>${removedLocationRows}</strong>
+                `);
+            } catch (error) {
+                console.error(error);
+                setStatus(`<strong>Error:</strong> ${escapeHtml(error.message)}`);
+            } finally {
+                processBtn.disabled = !sourceFile;
+            }
+        }
+    </script>
+</body>
+
+</html>
