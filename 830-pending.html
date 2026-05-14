@@ -126,17 +126,17 @@
                 <input type="file" id="sourceFileInput" accept=".xlsx" />
             </label>
             <label>
-                SO Report
+                8.30 AM Report
                 <input type="file" id="soFileInput" accept=".xlsx" />
             </label>
             <button id="processBtn" onclick="processWorkbook()" disabled>Download Cleaned Excel</button>
             <button class="back-btn" onclick="window.location.href='index.html'">Back</button>
         </div>
         <div id="status" class="status">
-            Upload a pending workbook containing <strong>Source Data</strong>, then upload the <strong>SO Report</strong>.
+            Upload a pending workbook containing <strong>Source Data</strong> (usually Worksheet 3), then upload the <strong>8.30 AM Report</strong>.
         </div>
         <div class="note">
-            If the pending workbook already has an SO Report sheet, the second upload can be left empty.
+            If the pending workbook already has an 8.30 AM Report sheet, the second upload can be left empty.
         </div>
     </div>
 
@@ -148,13 +148,14 @@
         today.setHours(0, 0, 0, 0);
 
         const excludedLocations = new Set([
+            'QA',
             'BILLING',
+            'DISPATCH',
             'PACKING',
             'FINAL PACKING',
+            'PACKING FINAL PACKING',
             'FINALATTACHEMENTPACK',
-            'QA',
-            'ATTACHEMENTDISP',
-            'PATIENT ROOM'
+            'ATTACHEMENTDISP'
         ]);
 
         document.getElementById('sourceFileInput').addEventListener('change', (event) => {
@@ -170,12 +171,12 @@
         function updateReadyStatus() {
             document.getElementById('processBtn').disabled = !sourceFile;
             if (!sourceFile) {
-                setStatus('Upload a pending workbook containing <strong>Source Data</strong>, then upload the <strong>SO Report</strong>.');
+                setStatus('Upload a pending workbook containing <strong>Source Data</strong> (usually Worksheet 3), then upload the <strong>8.30 AM Report</strong>.');
                 return;
             }
 
-            const soName = soReportFile ? escapeHtml(soReportFile.name) : 'using SO Report sheet inside pending workbook';
-            setStatus(`Ready: <strong>${escapeHtml(sourceFile.name)}</strong><br>SO Report: <strong>${soName}</strong>`);
+            const soName = soReportFile ? escapeHtml(soReportFile.name) : 'using 8.30 AM Report sheet inside pending workbook';
+            setStatus(`Ready: <strong>${escapeHtml(sourceFile.name)}</strong><br>8.30 AM Report: <strong>${soName}</strong>`);
         }
 
         function setStatus(message) {
@@ -290,7 +291,7 @@
             const scanColumn = findScanLocationColumn(headers);
 
             if (!jobColumn || !reqDateColumn || !scanColumn) {
-                throw new Error('SO Report must have JobCard, Req/Required Date, and Last Scanning Location columns.');
+                throw new Error('8.30 AM Report must have JobCard, Req/Required Date, and Last Scanning Location columns.');
             }
 
             const lookup = new Map();
@@ -319,18 +320,19 @@
                 const buffer = await sourceFile.arrayBuffer();
                 await workbook.xlsx.load(buffer);
 
-                const sourceSheet = findSheet(workbook, 'Source Data');
-                let soSheet = findSheet(workbook, 'SO Report');
+                // Try finding by name 'Source Data', fallback to 3rd worksheet (index 2)
+                const sourceSheet = findSheet(workbook, 'Source Data') || workbook.worksheets[2];
+                let soSheet = findSheet(workbook, '8.30 AM Report') || findSheet(workbook, 'SO Report');
 
                 if (soReportFile) {
                     const soWorkbook = new ExcelJS.Workbook();
                     const soBuffer = await soReportFile.arrayBuffer();
                     await soWorkbook.xlsx.load(soBuffer);
-                    soSheet = findSheet(soWorkbook, 'SO Report') || soWorkbook.worksheets[0];
+                    soSheet = findSheet(soWorkbook, '8.30 AM Report') || findSheet(soWorkbook, 'SO Report') || soWorkbook.worksheets[0];
                 }
 
-                if (!sourceSheet) throw new Error('Source Data sheet not found.');
-                if (!soSheet) throw new Error('SO Report sheet not found.');
+                if (!sourceSheet) throw new Error('Source Data sheet not found (searched for "Source Data" or 3rd worksheet).');
+                if (!soSheet) throw new Error('8.30 AM Report sheet not found.');
 
                 const sourceHeaders = readHeaders(sourceSheet);
                 const sourceJobColumn = findJobColumn(sourceHeaders);
@@ -344,6 +346,9 @@
                 const soLookup = buildSoLookup(soSheet);
                 let updatedRows = 0;
                 let missingRows = 0;
+                
+                // Track sourceSheet ID to keep it later
+                const sourceSheetId = sourceSheet.id;
 
                 sourceSheet.eachRow((row, rowNumber) => {
                     if (rowNumber === 1) return;
@@ -382,6 +387,13 @@
                     }
                 }
 
+                // Remove all other sheets to keep only cleaned source data
+                workbook.worksheets.forEach(sheet => {
+                    if (sheet.id !== sourceSheetId) {
+                        workbook.removeWorksheet(sheet.id);
+                    }
+                });
+
                 const outputBuffer = await workbook.xlsx.writeBuffer();
                 const blob = new Blob([outputBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
                 const url = URL.createObjectURL(blob);
@@ -393,10 +405,10 @@
 
                 setStatus(`
                     <strong>Done.</strong><br>
-                    Updated from SO Report: <strong>${updatedRows}</strong><br>
-                    Missing SO Report match: <strong>${missingRows}</strong><br>
+                    Updated from 8.30 AM Report: <strong>${updatedRows}</strong><br>
+                    Missing 8.30 AM Report match: <strong>${missingRows}</strong><br>
                     Removed blank Req Date rows: <strong>${removedBlankReqRows}</strong><br>
-                    Removed overdate rows: <strong>${removedFutureRows}</strong><br>
+                    Removed overdate rows ( > Today): <strong>${removedFutureRows}</strong><br>
                     Removed blocked location rows: <strong>${removedLocationRows}</strong>
                 `);
             } catch (error) {
