@@ -338,10 +338,16 @@
         <div class="controls">
             <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
             <button onclick="exportFullWorkbook()">Download Excel</button>
-            <button onclick="window.location.href='830-pending.html'" style="background: var(--accent-red);">8.30 PENDING</button>
-            <button id="copyMainBtn" class="hidden" onclick="copySectionAsImage('mainReportContainer', this)" style="background: var(--primary-teal);">Copy Main Report</button>
-            <button id="copyCenterBtn" class="hidden" onclick="copySectionAsImage('centerKeralaContainer', this)" style="background: var(--primary-teal);">Copy Center Kerala</button>
-            <button id="copySouthBtn" class="hidden" onclick="copySouthSection()" style="background: var(--primary-teal);">Copy South Kerala</button>
+            <button onclick="window.location.href='830-pending.html'" style="background: var(--accent-red);">8.30
+                PENDING</button>
+            <button id="copyMainBtn" class="hidden" onclick="copySectionAsImage('mainReportContainer', this)"
+                style="background: var(--primary-teal);">Copy Main Report</button>
+            <button id="copyZone1Btn" class="hidden" onclick="copySectionAsImage('zone1Container', this)"
+                style="background: var(--primary-teal);">Copy Zone 1</button>
+            <button id="copyZone2Btn" class="hidden" onclick="copySectionAsImage('zone2Container', this)"
+                style="background: var(--primary-teal);">Copy Zone 2</button>
+            <button id="copyZone3Btn" class="hidden" onclick="copySectionAsImage('zone3Container', this)"
+                style="background: var(--primary-teal);">Copy Zone 3</button>
         </div>
 
 
@@ -351,13 +357,17 @@
             <div id="mainReportContainer" class="report-section">
                 <table id="reportTable"></table>
             </div>
-            
-            <div id="centerKeralaContainer" class="report-section" style="margin-top: 50px; display: none;">
-                <table id="centerKeralaTable"></table>
+
+            <div id="zone1Container" class="report-section" style="margin-top: 50px; display: none;">
+                <table id="zone1Table"></table>
             </div>
-            
-            <div id="southKeralaContainer" class="report-section" style="margin-top: 50px; display: none;">
-                <table id="southKeralaTable"></table>
+
+            <div id="zone2Container" class="report-section" style="margin-top: 50px; display: none;">
+                <table id="zone2Table"></table>
+            </div>
+
+            <div id="zone3Container" class="report-section" style="margin-top: 50px; display: none;">
+                <table id="zone3Table"></table>
             </div>
         </div>
     </div>
@@ -381,6 +391,54 @@
         let filteredRawRows = [];
         let drillMap = {};
         let reportTime = '07.00AM';
+
+        // Zone area lookup sets (from ZONE LIST.xlsx)
+        const ZONE_1_AREAS = new Set([
+            'ALAPPUZHA', 'ALUVA', 'ANGAMALY', 'CHALAKUDY',
+            'ERNAKULAM-1 MANORAMA JN', 'ERNAKULAM-2 FORT COCHIN',
+            'ERNAKULAM-3 THRIPUNITHURA', 'ERNAKULAM-4 PALARIVATTOM',
+            'ERNAKULAM-6 KALAMASSERY', 'ERNAKULAM-7 EKM CITY',
+            'ERNAKULAM-8 KAKKANAD', 'ERNAKULAM-9 VARAPUZHA',
+            'ETTUMANOOR', 'IDUKKI', 'KALADY', 'KODUNGALLUR',
+            'KOLENCHERY', 'KOTHAMANGALAM', 'MUVATTUPUZHA',
+            'PALA', 'PIRAVOM', 'THODUPUZHA'
+        ]);
+
+        const ZONE_2_AREAS = new Set([
+            'TRIVANDRUM 1- MEDICAL COLLEGE', 'KOLLAM -2 KARUNAGAPPALI',
+            'TRIVANDRUM 3- NEDUMANGAD', 'TRIVANDRUM 7- KUMARAPURAM',
+            'TRIVANDRUM 8- KATTAKADA', 'KOTTARAKKARA -1 ADOOR',
+            'TRIVANDRUM 6- PETTAH', 'TRIVANDRUM 5- ATTINGAL2',
+            'KOLLAM -1 KOTTIYAM', 'TRIVANDRUM 2- VELLAYAMBALAM',
+            'KOTTARAKKARA -2 ANCHAL', 'KOLLAM -3 KUNDARA',
+            'KOLLAM -4 ATTINGAL1', 'CHENGANNUR', 'KANJIRAPPALLY',
+            'KAYAMKULAM', 'KOTTAYAM-1 CHANGANASSERY',
+            'KOTTAYAM-2 PAMPADY', 'MAVELIKARA', 'PATHANAMTHITTA',
+            'THIRUVALLA', 'TRIVANDRUM'
+        ]);
+
+        const ZONE_3_AREAS = new Set([
+            'COIMBATORE -1 RS PURAM', 'COIMBATORE -2 AVINASHI TRICHY ROAD',
+            'COIMBATORE -3 OOTY ROAD', 'COIMBATORE -5 POLLACHI',
+            'DINDUGAL', 'ERODE -1 CITY', 'ERODE -2 OUTER',
+            'KANCHIPURAM', 'KARUR', 'KRISHNAGIRI', 'KUMBAKONAM',
+            'MADURAI -1 PERIYAR', 'MADURAI -2 KK NAGAR',
+            'MADURAI -3 KALAVASAL', 'MADURAI -4 RAMANAD',
+            'NAGERCOIL -1 CITY', 'NAGERCOIL -2 MARTHANDAM',
+            'OOTY', 'SALEM -1 CITY', 'SALEM -2 OUTER',
+            'SIVAKASI', 'THANJAVUR', 'THIRUNELVELI -1 CITY',
+            'THIRUNELVELI -2 OUTER', 'TIRUPUR -1 TOWN',
+            'TIRUPUR -2 PALLADAM', 'TRICHY -1 CITY',
+            'TRICHY -2 PUDUKKOTTAI', 'UDUMALPET'
+        ]);
+
+        function getZone(areaValue) {
+            const area = normalizeText(areaValue);
+            if (ZONE_1_AREAS.has(area)) return 1;
+            if (ZONE_2_AREAS.has(area)) return 2;
+            if (ZONE_3_AREAS.has(area)) return 3;
+            return null;
+        }
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -562,28 +620,40 @@
             renderTable('reportTable', `C & B PENDING REPORT @ <span contenteditable="true" oninput="reportTime = this.innerText" style="border-bottom: 1px dashed var(--secondary-blue); cursor: text; padding: 0 4px;">${reportTime}</span>`, mainReport.data, mainReport.dates, mainReport.total);
             document.getElementById('copyMainBtn').classList.remove('hidden');
 
-            // 2. Center Kerala
-            const centerRows = filteredRawRows.filter(r => normalizeText(r.District) === 'CENTER KERALA');
-            const centerReport = getReportDataFromRows(centerRows);
-            if (centerReport.data.length > 0) {
-                document.getElementById('centerKeralaContainer').style.display = 'block';
-                document.getElementById('copyCenterBtn').classList.remove('hidden');
-                renderTable('centerKeralaTable', 'CENTER KERALA PENDING REPORT', centerReport.data, centerReport.dates, centerReport.total);
+            // 2. Zone 1
+            const zone1Rows = filteredRawRows.filter(r => getZone(r.Area) === 1);
+            const zone1Report = getReportDataFromRows(zone1Rows);
+            if (zone1Report.data.length > 0) {
+                document.getElementById('zone1Container').style.display = 'block';
+                document.getElementById('copyZone1Btn').classList.remove('hidden');
+                renderTable('zone1Table', 'ZONE 1 PENDING REPORT', zone1Report.data, zone1Report.dates, zone1Report.total);
             } else {
-                document.getElementById('centerKeralaContainer').style.display = 'none';
-                document.getElementById('copyCenterBtn').classList.add('hidden');
+                document.getElementById('zone1Container').style.display = 'none';
+                document.getElementById('copyZone1Btn').classList.add('hidden');
             }
 
-            // 3. South Kerala
-            const southRows = filteredRawRows.filter(r => normalizeText(r.District) === 'SOUTH KERALA');
-            const southReport = getReportDataFromRows(southRows);
-            if (southReport.data.length > 0) {
-                document.getElementById('southKeralaContainer').style.display = 'block';
-                document.getElementById('copySouthBtn').classList.remove('hidden');
-                renderTable('southKeralaTable', 'SOUTH KERALA PENDING REPORT', southReport.data, southReport.dates, southReport.total);
+            // 3. Zone 2
+            const zone2Rows = filteredRawRows.filter(r => getZone(r.Area) === 2);
+            const zone2Report = getReportDataFromRows(zone2Rows);
+            if (zone2Report.data.length > 0) {
+                document.getElementById('zone2Container').style.display = 'block';
+                document.getElementById('copyZone2Btn').classList.remove('hidden');
+                renderTable('zone2Table', 'ZONE 2 PENDING REPORT', zone2Report.data, zone2Report.dates, zone2Report.total);
             } else {
-                document.getElementById('southKeralaContainer').style.display = 'none';
-                document.getElementById('copySouthBtn').classList.add('hidden');
+                document.getElementById('zone2Container').style.display = 'none';
+                document.getElementById('copyZone2Btn').classList.add('hidden');
+            }
+
+            // 4. Zone 3
+            const zone3Rows = filteredRawRows.filter(r => getZone(r.Area) === 3);
+            const zone3Report = getReportDataFromRows(zone3Rows);
+            if (zone3Report.data.length > 0) {
+                document.getElementById('zone3Container').style.display = 'block';
+                document.getElementById('copyZone3Btn').classList.remove('hidden');
+                renderTable('zone3Table', 'ZONE 3 PENDING REPORT', zone3Report.data, zone3Report.dates, zone3Report.total);
+            } else {
+                document.getElementById('zone3Container').style.display = 'none';
+                document.getElementById('copyZone3Btn').classList.add('hidden');
             }
 
             updateEmergencySummary();
@@ -596,12 +666,12 @@
             let html = `<thead>
                 <tr><th colspan="${colSpan}" class="report-title-cell">${title}</th></tr>
                 <tr class="header-row-1">
-                    <th rowspan="2" class="location-header">LAST<br>SCANNING<br>LOCATION</th>
+                    <th rowspan="2" class="location-header">LAST SCANNING LOCATION</th>
                     <th colspan="${dates.length}">REQUIRED DATE</th>
                     <th rowspan="2">Grand Total</th>
                 </tr>
                 <tr class="header-row-2">
-                    ${dates.map(d => `<th>📅 ${d}</th>`).join('')}
+                    ${dates.map(d => `<th> ${d}</th>`).join('')}
                 </tr>
             </thead><tbody>`;
 
@@ -645,7 +715,7 @@
                     <div class="emg-value">${window.emergencyWorkCount || 0}</div>
                     <div class="emg-note">(K4, L1 NOT CONSIDRED)</div>
                 </div>`;
-            
+
             document.getElementById('mainReportContainer').appendChild(emgCard);
         }
 
@@ -690,10 +760,7 @@
             }
         }
 
-        async function copySouthSection() {
-            // Special handler for south because of the specific button ID if needed
-            copySectionAsImage('southKeralaContainer', document.getElementById('copySouthBtn'));
-        }
+        // Zone copy functions are handled directly via onclick="copySectionAsImage(...)" on each button
 
         function showDetails(encodedLocation, date) {
             const location = decodeURIComponent(encodedLocation);
@@ -902,8 +969,9 @@
                 }
 
                 let nextRow = fillReportSheet(filteredRawRows, `C & B PENDING REPORT @ ${reportTime}`, 1);
-                nextRow = fillReportSheet(filteredRawRows.filter(r => normalizeText(r.District) === 'CENTER KERALA'), 'CENTER KERALA PENDING REPORT', nextRow);
-                nextRow = fillReportSheet(filteredRawRows.filter(r => normalizeText(r.District) === 'SOUTH KERALA'), 'SOUTH KERALA PENDING REPORT', nextRow);
+                nextRow = fillReportSheet(filteredRawRows.filter(r => getZone(r.Area) === 1), 'ZONE 1 PENDING REPORT', nextRow);
+                nextRow = fillReportSheet(filteredRawRows.filter(r => getZone(r.Area) === 2), 'ZONE 2 PENDING REPORT', nextRow);
+                nextRow = fillReportSheet(filteredRawRows.filter(r => getZone(r.Area) === 3), 'ZONE 3 PENDING REPORT', nextRow);
 
                 reportSheet.getColumn(1).width = 40;
                 dateColumns.forEach((_, i) => reportSheet.getColumn(i + 2).width = 12);
