@@ -969,8 +969,8 @@
                 }
 
                 let nextRow = fillReportSheet(filteredRawRows, `C & B PENDING REPORT @ ${reportTime}`, 1);
-                nextRow = fillReportSheet(filteredRawRows.filter(r => getZone(r.Area) === 1), 'ZONE 1 PENDING REPORT (SOUTH KERALA)', nextRow);
-                nextRow = fillReportSheet(filteredRawRows.filter(r => getZone(r.Area) === 2), 'ZONE 2 PENDING REPORT (CENTRAL KERALA)', nextRow);
+                nextRow = fillReportSheet(filteredRawRows.filter(r => getZone(r.Area) === 1), 'ZONE 1 PENDING REPORT', nextRow);
+                nextRow = fillReportSheet(filteredRawRows.filter(r => getZone(r.Area) === 2), 'ZONE 2 PENDING REPORT', nextRow);
                 nextRow = fillReportSheet(filteredRawRows.filter(r => getZone(r.Area) === 3), 'ZONE 3 PENDING REPORT', nextRow);
 
                 reportSheet.getColumn(1).width = 40;
